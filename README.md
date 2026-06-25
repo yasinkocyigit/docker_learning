@@ -1,65 +1,112 @@
-# Docker Teorik Ogrenme Sureci
+# Docker
 
-Bu dosya, Docker kurulumu yapilmadan once ogrenilmesi gereken teorik kavramlari ve konu anlatimlarini icermektedir. Konularda ilerlendikce ilgili basliklar altina notlar eklenecektir.
+Bu dosya, Docker kurulumu yapılmadan önce öğrenilmesi gereken teorik kavramları ve konu anlatımlarını içermektedir. Konularda ilerledikçe ilgili başlıklar altına notlar eklenecektir.
 
 ## Docker Nedir?
-Uygulamalari ve bagimliliklarini isletim sistemi seviyesinde izole bir sekilde calistiran platformdur.
+Basit sanallaştırılmış ortamlarda uygulamalar geliştirmek, dağıtmak ve yönetmek için kullanılan açık kaynaklı bir kapsayıcı platformudur.
 
-* Uygulamanin "benim bilgisayarimda calisiyordu, sunucuda neden calismiyor" problemini ortadan kaldirmak; her ortamda (yerel bilgisayar, test sunucusu, canli sunucu) ayni sekilde calismasini saglamaktır.
-* Linux cekirdegindeki **namespaces** (izolasyon) ve **cgroups** (kaynak sinirlama) ozelliklerini kullanarak uygulamalari hafif, hizli ve guvenli sekilde paketler ve calistirir.
+* Uygulamaları yalıtılmış ortamlara paketlemek; uygulamaları geliştirmeyi, dağıtmayı, bakımını yapmayı ve kullanmayı da kolaylaştırır.
+* Docker konteynerleri, sanal makinelerden daha hafif, daha hızlı ve kaynak açısından daha verimlidir.
 
 ---
 
 ## Konteyner - Container ve Sanal Makine - VM Farki
 
-Konteyner ve Sanal Makine teknolojileri uygulamalari izole etmek icin kullanilir, ancak calisma prensipleri farklidir.
+Konteyner ve Sanal Makine teknolojileri uygulamaları izole etmek için kullanılır, ancak çalışma prensipleri farklıdır.
 
 ### Sanal Makine - Virtual Machine
-* Her sanal makine, kendi icerisinde tam bir isletim sistemi (Guest OS) barindirir.
-* Donanim kaynaklari (CPU, RAM, Disk) hypervisor araciligiyla fiziksel sunucudan sanal makinelere kesin sinirlarla bolusturulur.
-* Bu durum yüksek kaynak tüketimine ve yavas baslama surelerine yol acar.
+* Her sanal makine, kendi içerisinde tam bir işletim sistemi barındırır.
+* Donanım kaynakları (CPU, RAM, Disk) hypervisor aracılığıyla fiziksel sunucudan sanal makinelere kesin sınırlarla bölünür.
+* Bu durum yüksek kaynak tüketimine ve yavaş başlama sürelerine yol açar.
 
 ### Konteyner - Container
-* Konteynerler, uzerinde calistiklari ana isletim sisteminin (Host OS) cekirdegini (kernel) ortaklasa kullanirlar.
-* Kendi iclerinde tam bir isletim sistemi barindirmazlar; sadece uygulamanin calismasi icin gereken kütüphaneleri ve dosyalari icerirler.
-* Kaynaklar dinamik olarak kullanilir, baslama sureleri milisaniyeler seviyesindedir.
+* Docker konteynerleri, çalışan uygulamalar için hafif sanallaştırılmıi çalışma ortamlarıdır.Uygulamaları izole ortamlara yani konteynerlere paketlemek; uygulamaları geliştirmeyi, dağıtmayı bakımını yapmayı ve kullanmayı da kolaylaştırır.
+* Konteynerler, üzerinde çalıştıkları ana işletim sisteminin çekirdeğini ortaklaşa kullanırlar.
+* Her konteyner kendi dosya sistemine, kütüphanelerine ve bağımlılıklarına sahiptir. Bu sayede farklı ortamlarda tutarlı çalışırlar.
+* Ana makinede çalışan uygulamaların işletim sistemi, bellek ve disk gibi kaynaklarını izole bir şekilde kullanır.
 
 ---
 
-## Docker Temel Bileşenleri
+### Docker Mimari Yapisi
 
-### Docker Engine
-Docker Daemon (arka plan servisi), REST API (iletisim koprusu) ve Docker CLI (komut satiri arayuzu) bilesenlerinin tamamini kapsayan, konteynerlerin olusturulup yonetilmesini saglayan ana istemci-sunucu uygulamasidir.
+```text
+Linux Docker Mimarisi
++-----------------------------------------------------------------+
+|                         REST Interface                          |
++-----------------------------------------------------------------+
+|                          Docker Engine                          |
+|  +----------------+ +---------------+ +-----------+ +---------+ |
+|  | libcontainerd  | |  libnetwork   | |   graph   | | plugins | |
+|  +----------------+ +---------------+ +-----------+ +---------+ |
++-----------------------------------------------------------------+
+|                       containerd + runc                         |
++-----------------------------------------------------------------+
+|  +--------------+ +---------------+ +----------------+ +-----+ |
+|  |Control Groups| |  Namespaces   | |Layer Capabil.  | |Other| |
+|  |   cgroups    | |Pid,net,ipc,mnt| |Union FS (AUFS) | | OS  | |
+|  +--------------+ +---------------+ +----------------+ +-----+ |
++-----------------------------------------------------------------+
+|                        Operating System                         |
++-----------------------------------------------------------------+
 
-### Docker Daemon
-* Arka planda calisan ve konteynerleri, imajlari, aglari ve birimleri yoneten servistir.
+Windows Docker Mimarisi
++-----------------------------------------------------------------+
+|                         REST Interface                          |
++-----------------------------------------------------------------+
+|                          Docker Engine                          |
+|  +----------------+ +---------------+ +-----------+ +---------+ |
+|  | libcontainerd  | |  libnetwork   | |   graph   | | plugins | |
+|  +----------------+ +---------------+ +-----------+ +---------+ |
++-----------------------------------------------------------------+
+|                         Compute Service                         |
++-----------------------------------------------------------------+
+|  +--------------+ +---------------+ +----------------+ +-----+ |
+|  |Control Groups| |  Namespaces   | |Layer Capabil.  | |Other| |
+|  | Job objects  | |Object NS...   | |Registry, Union | | OS  | |
+|  +--------------+ +---------------+ +----------------+ +-----+ |
++-----------------------------------------------------------------+
+|                        Operating System                         |
++-----------------------------------------------------------------+
+```
 
-### Docker CLI
-* Kullanicinin Docker ile iletisim kurmasini saglayan komut satiri arayuzudur. Komutlar Docker Daemon'a iletilir.
-
-### Docker Image
-* Konteynerlerin olusturulmasinda kullanilan, uygulamanin calisma ortamini barindiran salt okunur (read-only) sablondur.
-
-### Docker Container
-* Imajlarin calisabilir durumdaki canli ornekleridir.
-
-### Dockerfile
-Bir uygulamanin calismasi icin gereken tum adimlari ve bagimliklari iceren, Docker'in otomatik imaj uretmesini saglayan, uzantisi olmayan metin tabanli bildirimsel bir dosyadir.
+* Konteynerlar birbirinden izole çalışırlar. Linux veya Windows kernel da  hem konteynerlerin birbirinden izole çalışmasını sağlayan hem de konteynerlerin kullanması gereken kaynakları belirleyen iki farklı servis bulunur:
+  * **cgroups**: Bir konteynerin kullanabileceği CPU, RAM, disk, ağ gibi kaynakları sınırlar.Yani konteynerlerin erişebileceği alanları kısıtlayan teknolojidir. 
+  * **Namespaces**: Bir konteynerin diğer konteynerlerden izole çalışmasını sağlar.Konteynerlerin sadece kendi üzerinde çalışan servislerini görmesini ve erişmesini sağlar.Bu sayede konteynerler birbirinden izole çalışır. İşletim sistemi üzerinde çalışan servisleri göremez ve bunların disk ram gibi donanım kaynaklarına erişimleri sağlayamaz.
+    * **Pid**: Çalışan processleri birbirinden izole hale getiren teknolojidir.
+    * **Net**: Ağ kaynaklarını birbirinden izole hale getiren teknolojidir.Network interface ve routing tablolarını izole eder
+    * **Mnt**: Dosya sistemlerini birbirinden izole hale getiren teknolojidir. .
+    * **Uts**: Host adını birbirinden izole hale getiren teknolojidir.
+    * **Ipc**: Inter process communication, Processler arası iletişimi birbirinden izole hale getiren teknolojidir.
+    * **User**: Kullanıcıları birbirinden izole hale getiren teknolojidir.
 
 ---
 
-## Imaj Katmanlari ve Kayit Defteri - Registry
+### Docker Mimari Bölümleri
+**1. DOCKER_Client**: Kullanıcıların komutlarını Docker Daemon'a ilettiği aracıdır. Genellikle docker CLI olarak kullanılır. REST API üzerinden Docker Daemon ile iletişim kurar. docker build, docker pull, docker run gibi komutları bu araç ile çalıştırılır.
+**2. DOCKER_HOST**: Docker Daemon'un çalıştığı makineyi belirtir. REST API üzerinden Docker Daemon ile iletişim kurar.Docker engine'in üzerinde çalıştığı host makineye denir. Yani Docker'ın üzerinde çalıştığı işletim sistemidir.Tüm konteyner süreçleri ve işlemler bu host makine üzerinde çalışır.
+**3. DOCKER_Registery**: Docker Image'larının depolandığı yerdir.Kayıt defteri anlamına gelir.İmajların depolandığı ve paylaşıldığı yerdir.Docker Hub, Docker'ın resmi kayıt defteridir. 
 
-### Katmanli Dosya Sistemi
-* Bir Docker imaji ust uste binen salt okunur katmanlardan (read-only layers) olusur.
-* `Dockerfile` icindeki her bir komut (ornegin `COPY` veya `RUN`) yeni bir katman olusturur.
-* Konteyner calistirildiginda, bu salt okunur katmanlarin en ustune gecici bir yazilabilir katman (read-write container layer) eklenir. Yapilan tum degisiklikler bu katmanda tutulur. Konteyner silindiginde bu katman da silinir, alttaki orijinal imaj degismez.
 
-### Kayit Defteri ve Docker Hub
-* Olusturulan imajlarin depolandigi ve paylasildigi merkezi depolardir.
-* **Docker Hub**, varsayilan resmi ve halka acik imaj deposudur. Resmi veri tabanlari (PostgreSQL, Redis), isletim sistemleri (Ubuntu, Alpine) ve dil platformlari (Node.js, Python) buradan indirilir.
+**Geleneksel sanallaştırmada hypervisor - VMware, VirtualBox, KVM- vardır. Fiziksel kaynaklar -CPU, RAM, Disk, Ağ kartı- Hypervisor tarafından bölünür ve her sanal makineye sanal kaynaklar olarak sunulur. Her VM kendi işletim sistemini çalıştırır.**
 
+Docker ise donanımı sanallaştırmaz. CPU RAM ve ağ kartını sanallaştırma yerine mevcut işletim sisteminin çekirdeğini - kernel - paylaşır.
+
+Fiziksel Donanım -> İşletim Sistemi - Linux Kernel --> Docker Engine ->  Container1, Container2, Container3 ... 
+
+Geleneksel Sanallaştırma
+Fiziksel Donanım -> İşletim Sistemi - Linux Kernel
+                       -> Hypervisor - VMware, VirtualBox, KVM -
+                                       -> Sanal Makine1  
+                                       -> Sanal Makine2
+                                       -> Sanal Makine3
+
+Her container:
+  * Aynı süreçler görür
+  * Ayrı dosya sistemi görür
+  * Ayrı ağ yapılandırması görür  
+  * Ama hepsi tek bir kernel üzerinde çalışır.
 ---
+
 
 ## Docker Kurulum Adimlari - Fedora
 
@@ -77,89 +124,36 @@ sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin d
 
 # 4. Servisi baslatma ve etkinlestirme
 sudo systemctl start docker
-sudo systemctl enable docker
+sudo systemctl enable --now docker
+docker --version
 
 # 5. Kullaniciyi docker grubuna ekleme
 sudo usermod -aG docker $USER
+
+
+# docker servisinin çalıştığını doğrulama
+sudo docker run hello-world
+
+# Çalışan konteynerleri listeleme
+sudo docker ps -a
+
+# ubuntu/ fedora konteyner imajını indirme ve çalıştırmave bash ile bağlanma
+sudo docker run -it fedora/ubuntu bash
+
+# konteyner haline getirilen işletim sisteminin paket listesini günceller
+apt-get update
+
+# eğer konteyner kapandıktan sonra silinmesi istenirse
+docker run --rm it fedora bash
+
+# containerleri tek tek silmek için
+docker rm <CONTAINER_ID>
+
+# durmuş tüm konteynerleri silmek için
+docker container prune
+
+# durmuş ve çalışan tüm konteynerleri silmek için
+docker container prune -a
+
 ```
-
 ---
-
-## Ilk Pratik Uygulama - hello-world
-
-Kurulum sonrasi calistirilacak ilk test komutudur:
-```bash
-docker run hello-world
-```
-
----
-
-## `docker run` Nedir?
-Yeni bir konteyner olusturmak ve calistirmak icin kullanilan temel Docker komutudur.
-
-* Imaj halindeki pasif uygulamanin bilgisayarda calisir bir surec (proses) haline getirilmesini saglar.
-* Arka planda `docker pull` (gerekirse indirir), `docker create` (konteyner yapisini hazirlar) ve `docker start` (calistirir) komutlarini tek adimda birlestirir.
-
-### Calisma Adimlari:
-1. **Yerel Kontrol:** Imaj bilgisayarda var mi bakar.
-2. **Indirme (Pull):** Yoksa Docker Hub'dan indirir.
-3. **Olusturma (Create):** En uste yazilabilir katman ekler.
-4. **Ag Atama:** Sanal ag ve IP tanimlar.
-5. **Baslatma (Start):** Uygulama surecini (prosesini) baslatir.
-
-
----
-
-## Imaj ve Konteyner Listeleme
-
-### 1. Yerel Imajlarin Listelenmesi
-```bash
-docker images
-```
-
-### 2. Konteynerlerin Listelenmesi
-* Sadece calisan konteynerleri gormek icin:
-  ```bash
-  docker ps
-  ```
-* Calismis ve durdurulmus olanlar dahil tum konteynerleri gormek icin:
-  ```bash
-  docker ps -a
-  ```
-
----
-
-## Arka Planda Calistirma - Detached ve Port Yonlendirme - Publishing
-
-Sadece calisip duran degil, arka planda surekli istek dinleyen servisler (web sunucusu vb.) icin yeni parametreler kullanilir.
-
-### Kullanilacak Komut:
-```bash
-docker run -d -p 8080:80 nginx
-```
-
-* `-d` (Detached): Konteynerin arka planda calismasini saglar. Terminal ekranini kilitlemez.
-* `-p 8080:80` (Port Publishing): Host (kendi bilgisayariniz) ile konteyner arasinda port koprusu kurar. 
-  * `8080` -> Bilgisayarinizdaki disari acik port.
-  * `80` -> Konteynerin icinde Nginx'in dinledigi port.
-* `nginx`: Docker Hub'dan indirilecek resmi Nginx web sunucusu imaji.
-
----
-
-## Konteyner Durdurma - docker stop
-Calisan bir konteynerin calismasini guvenli sekilde sonlandirmak icin kullanilir.
-
-* Calisan bir sureci (prosesi) durdurma komutudur.
-* Konteynerin kaynak (CPU/RAM) tüketmesini engellemek ve isi bittiginde durdurmak.
-* Konteyner icindeki ana prosese `SIGTERM` sinyali gondererek uygulamanin verileri kaydedip guvenli kapanmasini saglar. Eger belirlenen surede kapanmazsa `SIGKILL` ile zorla kapatir.
-* Kullanimi: `docker stop <konteyner_id_veya_adi>`
-
----
-
-## Konteyner Silme - docker rm
-Durdurulmus olan konteynerleri diskten kalici olarak silmek icin kullanilir.
-
-* Konteyner dosya yapisini ve metadata kaydini bilgisayardan temizleme komutudur.
-* Artik ihtiyac duyulmayan eski konteynerlerin diskte yer kaplamasini onlemek.
-* Konteynerin en ust katmanindaki yazilabilir (read-write) katmani ve konteyner tanimini tamamen siler.
-* Kullanimi: `docker rm <konteyner_id_veya_adi>`
