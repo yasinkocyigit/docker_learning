@@ -29,7 +29,7 @@ root           1       0  0 21:16 ?        00:00:00 ps -ef
 ```bash
 docker container run -it centos:7 bash/shell
 '''
--i:  interaktif mod     
+-i:  interaktif mod  -i (interactive): stdin'i açık tutar, klavyeden komut yazabilesin    
 -t:  terminal  
 
 echo "buradayiz" > test.txt
@@ -203,3 +203,23 @@ docker plugin inspect <plugin_id>  --> plugin hakkında detaylı bilgi verir.
 docker plugin install <plugin_id>  --> plugin'i kurar.
 
 docker plugin rm <plugin_id>  --> plugin'i siler. Plugin yüklü durumda ise silinemez.Mutlaka exited modda olması gerekir.
+
+docker search <image>  --> hub.docker.com'da image arar. Örnek: docker search mysql
+
+# mysql imajını indirip çalıştır
+docker run -d \
+--name mysql \ 
+-e MYSQL_ROOT_PASSWORD=1234 \ 
+-p 3306:3306 \  # host_port:container_port  host'taki 3306 portunu container'daki 3306 portuna bağlar
+mysql:latest  --> mysql imajını çalıştırır.
+docker exec -it mysql mysql-db  -uroot -p  ---> mysql-db  container'ına root kullanıcısı ile bağlanır. -p  şifre istendiğini belirtir.
+
+# hub.docker.com için cli'den bağlanma
+docker login  --> hub.docker.com'a kullanıcı adı ve şifre ile bağlanır.
+
+# Dockerfile örneği
+# dockerfile_ex.Dockerfile dosyası yazılır.
+docker image build --tag dockerfile_ex <image_name> -f dockerfile_ex.Dockerfile <dockerfile_name> .   --> bu komut ile image build edilir. tag verilir.
+
+docker run --rm dockerfile_ex  --> bu komut ile image çalıştırılır. Çalışırken aynı zamanda Dockerfile içerisindeki CMD komutu çalışır ve bu komut ile container sonlanır ve --rm ile container silinir.
+

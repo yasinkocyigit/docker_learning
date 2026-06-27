@@ -157,3 +157,23 @@ docker container prune -a
 
 ```
 ---
+
+## Docker File
+* Dockerfile Docker tarafında Docker Image'leri oluşturmak için kullanılan bir dosyadır. Bu Dockerfile dosyası kullanılarak, Docker Image'lerinin içeriğini, nasıl oluşturulacağını, hangi OS 
+versiyonları içereceği ve nasıl yapılandırılacağı tanımlanabilir.
+
+* Uzantısı yoktur. Sadece Dockerfile olarak yazılır.
+* Dockerfile'da bulunan her komut, Docker Engine tarafından çalıştırılır ve bir katman oluşturulur.Sonunda uygulamaya ait Docker Image'i elde edilir.
+
+* Bu elde edilen Docker Image, Docker Engine tarafından çalıştırıldığında bir Docker Container elde edilir.
+
+* Dockerfile'lar, FROM denilen base imageler'ı seçerek başlar. Seçildikten sonra bu image'ın altında işletilecek komutlar, parametreler ve  port bilgileri ,  işletim sistemi ayarları gibi bilgiler yer alır. Bu komutlar, Docker Engine tarafından build sırasında çalıştırılarak, Dockerfile'ın içeriği işlenerek  sonrasında Docker Image oluşturulur. 
+
+Dockerfile - essential commands --> Docker Engine build --> Docker Image --> Docker Container
+
+* **Dockerfile Örnek:** [docker_command.md](./docker_command.md#L220)
+* centos işletim sistemi için bir template oluşturma ve bunu container template'i imajını oluşturma. Kurulduktan sonra direkt olarak update'i de yapılsın. update yapıldıktan sonra ihtiyaca göre paketlerde kurulsun. Yüklenen uygulamalar, bir parametrede çalıştırılacaksa, ilgili parametreleri Dockerfile'a gömerek çıktıların Dockerfile içerisinde gerçekleştirilsin  ve centos işletim sisteminde 80 portu açılsın. 
+
+
+Tek bir Dockerfile üzerinden birden fazla layer ya da işletim sistemi build edilebilir. Her katman için özel bir hash oluşturulur. Buna **content_hash** denir. Docker, bu hash değerini kullanarak Katmanları önbelleğe alır. Böylece, aynı katmanı tekrar build etmesine gerek kalmaz. Bu sayede hem zamandan hem de disk alanından tasarruf sağlanır.Buradaki katmanların her biri öncelikle hep beraber hashlenir. Daha sonra tüm katmanlar birbirinden ayrıştırılarak distribution hash denilen şekilde hashlenir.  
+
