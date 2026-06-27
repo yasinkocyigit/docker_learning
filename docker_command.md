@@ -1,225 +1,338 @@
-## Docker Komutları
+# Docker Komutları ve Kullanım Kılavuzu
+
+Bu belgede, Docker komutlarının işlevleri, parametreleri, kullanım örnekleri ve konteyner yönetim süreçlerine ait pratik notlar yer almaktadır.
+
+---
+
+## 1. Docker Bilgileri ve Durum Sorgulama
 
 ```bash
-# docker durumunu, host bilgilerini, kayıtlı imajları, çalışan konteynerleri, ağları, disk kullanımını, versiyon bilgisini vb. verir. Server üzerinde kaç tane container çalışıyor, server versiyonu ne, docker host üzerinde kaç tane image dosyası var gibi birsürü bilgiyi verir. 
-# docker root directory, docker'ın tüm dosyalarını sakladığı dizindir. varsayılan değeri /var/lib/docker'dır.
-
+# Docker durumunu, host bilgilerini, kayıtlı imajları, çalışan konteynerleri, ağları, disk kullanımını, versiyon bilgisini vb. verir. 
+# Server üzerinde kaç tane container çalışıyor, server versiyonu ne, docker host üzerinde kaç tane image dosyası var gibi bir sürü bilgiyi verir.
+# Docker root directory - docker'ın tüm dosyalarını sakladığı dizin -  bilgisini gösterir - varsayılan değeri /var/lib/docker'dır - .
 sudo docker info
-
-# docker ortamında çalışan konteynerleri listelemek için
-docker ps       # -a parametresi ile de durmuş olanlarda dahil bütün konteynerleri listeler.
-docker container ls  # -a parametresi ile de durmuş olanlarda dahil bütün konteynerleri listeler.
-
-# konteyner ile belirli bir sürümdeki işletim sistemini çağırmak için ubuntu 22.04 
-docker run -i -t ubuntu:22.04  echo "hello-world"      # cat /etc/os-release  ile ubuntu 22.04 olduğu görülebilir.
-''' burada bir exit moda düşer docker ps üzerinde listelenmez, docker ps -a ile listelenir. Çünkü Container içinde çalışan ana process biterse container da biter - EXIT olur. '''
-
-
-docker run centos:7 ps -ef
-'''
-UID          PID    PPID  C STIME TTY          TIME CMD
-root           1       0  0 21:16 ?        00:00:00 ps -ef
-'''
-
 ```
 
+---
 
-## container'a baglantı kurmak icin interactive ve ti komutları
+## 2. Konteyner Listeleme ve Filtreleme
+
+```bash
+# Docker ortamında çalışan konteynerleri listelemek için
+docker ps
+docker container ls
+
+# -a parametresi ile durmuş olanlar da dahil bütün konteynerleri listeler
+docker ps -a
+docker container ls -a
+
+# Konteynerlerin detaylı ID'lerini görmek için - Uzun CONTAINER ID'lerin altından devamını "..." ile kısaltmaz, tam ID'leri verir. Log inceleme ve detaylı konteyner işlemlerinde gereklidir - 
+docker container ls -a --no-trunc
+
+# Sadece konteyner ID'lerini - quiet modda -  listelemek için
+docker container ls -a -q
+
+# Son eklenen/oluşturulan konteynerleri listeler
+docker container ls -l
+```
+
+### Konteyner Filtreleme Parametreleri
+Filtreleme yapmak için `--filter "anahtar=değer"` parametresi kullanılır.
+
+```bash
+# Çalışan konteynerleri listeler
+docker container ls -a --filter "status=running"
+
+# Durmuş/bitmiş konteynerleri listeler
+docker container ls -a --filter "status=exited"
+
+# İsme göre filtreler
+docker container ls -a --filter "name=test"
+
+# ID'ye göre filtreler
+docker container ls -a --filter "id=<container_id>"
+
+# Belirli bir imajdan üretilen konteynerleri filtreler
+docker container ls -a --filter "ancestor=ubuntu:22.04"
+
+# Label - etiket -  parametresine göre filtreler
+docker container ls -a --filter "label=test"
+
+# Belirli bir konteynerden önce oluşturulanları listeler
+docker container ls -a --filter "before=<container_id>"
+
+# Belirli bir konteynerden sonra oluşturulanları listeler
+docker container ls -a --filter "since=<container_id>"
+
+# Sağlık durumu 'healthy' - sağlıklı -  olanları filtreler
+docker container ls -a --filter "health=healthy"
+
+# Sağlık durumu 'unhealthy' - sağlıksız -  olanları filtreler
+docker container ls -a --filter "health=unhealthy"
+
+# Sağlık durumu başlama aşamasında - starting -  olanları filtreler
+docker container ls -a --filter "health=starting"
+```
+
+---
+
+## 3. Konteyner Bağlantıları ve Etkileşimli - Interactive -  Mod
+
+```bash
+# Konteyner ile belirli bir sürümdeki işletim sistemini çağırmak için - örneğin ubuntu 22.04 - 
+docker run -i -t ubuntu:22.04 echo "hello-world"
+# cat /etc/os-release ile ubuntu 22.04 olduğu görülebilir.
+# NOT: Burada komut çalıştıktan sonra çıkış - exit -  moduna düşer, süreç bittiği için docker ps üzerinde listelenmez. docker ps -a ile listelenir. Çünkü konteyner içinde çalışan ana process biterse konteyner da biter - EXIT olur - .
+
+# centos 7 üzerinde süreçleri listelemek için
+docker run centos:7 ps -ef
+# Çıktı Örneği:
+# UID          PID    PPID  C STIME TTY          TIME CMD
+# root           1       0  0 21:16 ?        00:00:00 ps -ef
+```
+
+### İnteraktif ve TTY Kullanımı - `-it` - 
 
 ```bash
 docker container run -it centos:7 bash/shell
-'''
--i:  interaktif mod  -i (interactive): stdin'i açık tutar, klavyeden komut yazabilesin    
--t:  terminal  
+# -i - interactive - : stdin'i - standart girişi -  açık tutar, klavyeden komut yazabilmenizi sağlar.
+# -t - tty - : Bir terminal ekranı tahsis eder.
+```
 
-echo "buradayiz" > test.txt
-cat test.txt
+**Konteyner Dosya Sistemi ve Davranış Notları:**
+1. İnteraktif modda konteyner açıp içine dosya yazalım:
+   ```bash
+   echo "buradayiz" > test.txt
+   cat test.txt
+   # 'exit' komutu ile çıkış yapılır.
+   ```
+2. Çıkış yapıldıktan sonra konteyner durur, `docker ps` üzerinde görünmez, `docker ps -a` ile görünür.
+3. Sonrasında tekrar `docker run -it centos:7 bash/shell` komutunu çalıştırırsak `test.txt` dosyasının içeriği görünmez. Çünkü **her konteyner kendi dosya sistemine sahiptir** ve `docker run` her seferinde yeni bir konteyner oluşturup/başlatır.
+4. Bu durumdan kurtulmak - yani çalışan konteyner içinde kalmak -  için konteyner arka planda interaktif olarak çalıştırılabilir: `docker container run -d -it centos:7 bash/shell`. Bu sayede konteyner durdurulmaz ve içine girildiğinde dosyalar görünür kalır.
+5. Durdurulan konteyneri yeniden başlatmak ve içine girmek için:
+   ```bash
+   # Konteyneri başlat
+   docker container start <container_id>
+   docker ps # Çalıştığını görüntüleme
+   
+   # Çalışan konteynere bağlanıp bash çalıştırmak
+   docker container exec -it <container_id> bash/shell
+   # NOT: -it parametresi interaktif bağlantı kurmak ve terminal bağlamak için gereklidir, kullanılmazsa terminale bağlanılamaz.
+   
+   # Konteyneri durdurma
+   docker container stop <container_id>
+   docker ps # Durum görüntüleme
+   ```
+*Önemli Not:* İnteraktif bağlantı yapıldığında ve yazılabilir operasyonlar gerçekleştirilip konteynerden `exit` ile çıkıldığında, konteyner durdurulmuş - Exited -  sayılır.
 
-exit ile çıkılır
+---
 
-docker ps üzerinde görünmez. docker ps -a ile görünür.
+## 4. Arka Planda - Detached -  Çalıştırma ve Log Yönetimi
 
-sornasında tekrar
-docker run -it centos:7 bash/shell 
+* **-d - detached - **: Konteynerin arka planda çalışmasını sağlar.
+* **-t - tty - **: Terminal tahsis eder.
+* **-i - interactive - **: İnteraktif giriş sağlar.
 
-test.txt  dosyasının içeriğini görünmez. Çünkü her container kendi dosya sistemine sahiptir. Ve container'dan çıkıldığında container durdurulur. docker run -it centos:7 bash/shell ile yeni bir container create edilir/başlatılır. Bu nedenle test.txt  dosyasının içeriği görünmez. Bu durumdan kurtulmak için docker container run -d -it centos:7 bash/shell komutu kullanılır. Bu sayede container durdurulmaz ve test.txt  dosyasının içeriği görünür.
+Normal çalışma süresinde - runtime -  docker çalışır, süreç çalışır, konteyner çalışır, gönderilen işlem bittiğinde konteyner otomatik olarak exit moduna düşer.
 
-docker container start <container_id>
-docker ps  # görüntüleme
-
-docker container stop <container_id>
-docker ps  # görüntüleme
-
-docker container exec -it <container_id> bash/shell # -it: interaktif mod ve terminal bağlamak için kullanılır. olmazsa bağlanmaz
-
-
-
-interactive connection yapıldığında ve yazılabilir operasyonlar gerçekleştirilip container'dan exit edilirse container durdurulmuş sayılır.
-
-# contaienrlerin detaylı olarak id'leri hakkında bilgi almak için. Detaylı olarak log incele ve container işlemlerinde gereklidir. Çıktıda uzunCONTAINER ID 'lerin altından devamını "..." ile kısaltır.
-docker container ls -a --no-trunc
-
-# sadece container id'lerini görmek için
-docker container ls -a -q
-
-docker container ls -l  # son eklenen konteynerleri listeler
-
-# Filtreleme yapmak için kullanılır. Kullanımı: docker container ls -a --filter "key=value"
-docker container ls -a --filter "status=running"          # çalışan konteynerleri listeler
-docker container ls -a --filter "status=exited"           # bitmiş konteynerleri listeler
-docker container ls -a --filter "name=test"               # name parametresi ile filtreler
-docker container ls -a --filter "id=<container_id>"       # id parametresi ile filtreler
-docker container ls -a --filter "ancestor=ubuntu:22.04"   # ancestor parametresi ile filtreler
-docker container ls -a --filter "label=test"              # label parametresi ile filtreler
-docker container ls -a --filter "before=<container_id>" # before parametresi ile filtreler
-docker container ls -a --filter "since=<container_id>"  # since parametresi ile filtreler
-docker container ls -a --filter "health=healthy"          # health parametresi ile filtreler
-docker container ls -a --filter "health=unhealthy"        # health parametresi ile filtreler
-docker container ls -a --filter "health=starting"         # health parametresi ile filtreler
-
-
-# deatch (arkada calisan) ve  attach (one plan) baglantı 
-
-# d: deatch (arkada calisan)
-# t: terminal
-# i: interaktif
-
-
-'''
-runtime normalde docker çalışır, process çalışır, container çalışır, gönderilen process çalışır ve sonrasında container exit moduna düşer
-
--d flag'ı işletilip deatch modda bir container başlatılırsa, container arkada çalışmaya devam eder ve containerdan çıkılmaz. 
-
-örnek olarak ilk başta normal runtime ile lokale 10 kez ping atılır.
+```bash
+# İlk olarak normal modda yerel adrese 10 kez ping atalım:
 docker container run centos:7 ping 127.0.0.1 -c 10
-bu ping işlemi tamamlanınca direkt olarak container exit moda geçer. --> docker container ls -a
+# Bu ping işlemi tamamlanınca süreç bittiği için konteyner direkt exit moduna geçer. - docker container ls -a ile kontrol edilebilir - 
 
-eğer bu process'i arka planda çalıştırılmak istenirse
-docker container run -d centos:7 ping -c 1000 127.0.0.1  --> 1000 kez ping atar ve arkada çalışır.
-docker container ls ile bakıldığında bu container RUNNING modda olduğu görülür.
+# Eğer bu sürecin arka planda çalışması istenirse -d parametresi kullanılır:
+docker container run -d centos:7 ping -c 1000 127.0.0.1
+# Bu komut arka planda 1000 kez ping atar. docker container ls ile bakıldığında konteynerin RUNNING modda olduğu görülür.
 
+# Arka planda çalışan konteynerin çıktılarını/loglarını incelemek için:
+docker container logs <container_id>
 
+# Arka planda çalışan konteynerin ana sürecine - PID 1 -  doğrudan bağlanmak için:
+docker container attach <container_id>
+# NOT: Bağlandıktan sonra Ctrl+C tuş kombinasyonu yapılırsa konteyner kendini durdurur - exited moda sokar - .
+```
 
-docker container logs <container_id>  --> bu komut ile arka planda çalışan container'ın logları incelenebilir.
+### Log Ayarları ve Görüntüleme Seçenekleri
 
-docker container attach <container_id>  --> bu komut ile arka planda çalışan container'a bağlanılır.
-Daha sonra Ctrl+C yapıldığında container kendini exited moda sokar.
-
-
-'''
-
-# logging-options : docker log ayarlarını içerir.
-
-# logging-driver : log yazma seklini belirler. varsayılan json-file dir. --logging-opt max-size=10m  --logging-opt max-file=3 ile log dosyasının boyutunu ve sayısını belirler
+```bash
+# --logging-driver: Log yazma şeklini belirler. Varsayılan olarak 'json-file'dır.
+# --logging-opt: Log dosyalarının sınırlarını belirler. max-size=10m - dosya boyutu en fazla 10MB -  ve max-file=3 - en fazla 3 dosya tutulur -  ayarları yapılabilir.
 docker container ls --logging-driver json-file --logging-opt max-size=10m --logging-opt max-file=3
 
-# tail ile son 10 satırı gösterir. --tail 10 <container_id>
+# --tail: Log çıktısının sadece son belirli satırını görmek için kullanılır - Örnek: son 10 satır - 
 docker container logs --tail 10 <container_id>
 
-# 
-docker container logs -f <container_id>  --> -f flag ile loglar canlı olarak izlenebilir.
+# -f - follow - : Logları terminale sabitleyerek canlı olarak izlemek için kullanılır
+docker container logs -f <container_id>
+```
 
+---
 
+## 5. Konteyner Başlatma, Durdurma ve Süreç Yönetimi - PID 1 - 
 
-# container başlatma-durdurma
-docker container run -d tomcat  # runtime'da çalıştırır.
-docker container stop <container_id>  # container'ı durdurur. RUNNING moddan EXIT moda sokar.
+```bash
+# Yeni bir imajı arka planda ilk kez çalıştırır - runtime - 
+docker container run -d tomcat
 
-docker container start -a <container_id>  # container'ı çalıştırır. EXIT moddan RUNNING moda sokar. Runtime modunda çalışır.
-docker container start <container_id>  # container'ı çalıştırır. EXIT moddan RUNNING moda sokar. Deatch modda çalışır.
+# Çalışan bir konteyneri durdurur - RUNNING moddan EXIT moda sokar - 
+docker container stop <container_id>
 
+# Durmuş olan bir konteyneri ön planda - attach/interactive -  çalıştırır
+docker container start -a <container_id>
 
-docker container kill <container_id>   # Container'ı SIGKILL sinyali göndererek anında durdurur (RUNNING → EXITED).
+# Durmuş olan bir konteyneri arka planda - detached -  çalıştırır
+docker container start <container_id>
 
-# stop ile kill arasındaki fark:
-# - docker stop:
-#   Önce SIGTERM sinyali göndererek çalışan process'in düzgün şekilde kapanmasını bekler.
-#   Belirli bir süre içinde kapanmazsa SIGKILL göndererek zorla sonlandırır.
-#
-# - docker kill:
-#   Varsayılan olarak doğrudan SIGKILL sinyali gönderir ve process'i anında sonlandırır.
-#   Programın temiz kapanmasına (cleanup) fırsat vermez.
+# Konteynere SIGKILL sinyali göndererek anında durdurur - RUNNING → EXITED - 
+docker container kill <container_id>
+```
 
-# Bir container içinde birden fazla process çalışabilir.
-# Ancak Docker'ın takip ettiği en önemli process ana process'tir (PID 1).
-# Container'ın yaşam süresi bu ana process'e bağlıdır.
-# Ana process sonlanırsa Docker container'ı durdurur ve diğer process'leri de sonlandırır.
+### Stop ve Kill Arasındaki Farklar
 
-# Ubuntu container'ını bash ile başlat
+* **docker stop**: Önce `SIGTERM` sinyali göndererek çalışan sürecin düzgün şekilde kapanmasını - temizlik işlemlerini yapmasını, verileri kaydetmesini -  bekler. Belirlenen varsayılan süre - genellikle 10 saniye -  içinde kapanmazsa `SIGKILL` göndererek zorla sonlandırır.
+* **docker kill**: Varsayılan olarak doğrudan `SIGKILL` sinyali gönderir ve süreci anında sonlandırır. Programın temiz kapanmasına - cleanup -  fırsat vermez.
+
+### Konteyner Süreç Mantığı - PID 1 - 
+
+Bir konteyner içinde birden fazla süreç - process -  çalışabilir. Ancak Docker'ın takip ettiği en önemli süreç, ana süreçtir - **PID 1** - . Konteynerin yaşam süresi bu ana sürece bağlıdır. Ana süreç sonlanırsa Docker konteynerini durdurur ve içindeki diğer tüm süreçleri de sonlandırır.
+
+Bunu görmek için şu deneyi yapabiliriz:
+```bash
+# 1. Ubuntu konteynerini bash ile başlatın:
 docker run -it ubuntu bash
 
-# Container içinde arka planda yeni bir process başlat
+# 2. Konteyner içinde arka planda yeni bir süreç başlatın:
 sleep 1000 &
 
-# Çalışan process'leri listele
+# 3. Çalışan süreçleri listeleyin:
 ps -ef
 
-UID          PID    PPID  C STIME TTY          TIME CMD
-root           1       0  0 21:02 pts/0    00:00:00 bash        --> Ana process
-root           8       1  0 21:03 pts/0    00:00:00 sleep 1000    --> Arka plandaki process
-root           9       1  0 21:03 pts/0    00:00:00 ps -ef        --> Mevcut process
+# Çıktı:
+# UID          PID    PPID  C STIME TTY          TIME CMD
+# root           1       0  0 21:02 pts/0    00:00:00 bash          --> Ana süreç - PID 1 - 
+# root           8       1  0 21:03 pts/0    00:00:00 sleep 1000    --> Arka plandaki süreç
+# root           9       1  0 21:03 pts/0    00:00:00 ps -ef        --> Mevcut sorgu süreci
+```
 
+---
 
-docker container inspect <container_id>   # Container'ın detaylı bilgilerini gösterir. JSON formatında çıktı verir. Config kısmını, network settings'i, mount'ları, process bilgilerini, log ayarlarını vb. birçok bilgiyi içerir. Container uygulamasının çalıştırıldığı ortam hakkında en detaylı bilgileri verir (IP ADRESS, MAC ADDRESS, PORTS, PATH,ENV,VOLUME vs.).  Cmd parametresi ile başlangıçta hangi komutun çalışacağını belirler. Entrypoint, bir container'ın çalıştırıldığı zaman yürütülecek varsayılan komutu ve davranışını tanımlar. Genellikle Dockerfile içinde ayarlanır ancak run komutunda override edilebilir. Bunun dışında Image kısmından image'ın ayarları,  hub.docker.com'dan hangi image'ın çekildiği, hangi version'ın çekildiği vb. bilgiler yer alır.  Eğer volume ataması yapılmazsa kapsayıcı kill edildiğinde veya ortamdan silindiğinde verileriyle beraber yok olur. Volume ataması yapılmazsa.
+## 6. Detaylı Konteyner İnceleme - Inspect -  ve Silme
 
-# container için belirli bir kısmı incelemek için
-docker container inspect <container_id|container_name> | grep IPAddress 
+```bash
+# Container'ın detaylı bilgilerini JSON formatında çıktı verir.
+# Config kısmını, network settings'i, mount'ları, process bilgilerini, log ayarlarını vb. birçok bilgiyi içerir.
+# Konteyner uygulamasının çalıştırıldığı ortam hakkında en detaylı bilgileri sunar - IP ADDRESS, MAC ADDRESS, PORTS, PATH, ENV, VOLUME vb. - .
+# 'Cmd' parametresi ile başlangıçta hangi komutun çalışacağını, 'Entrypoint' ile varsayılan komutun davranışını tanımlar - Dockerfile içinde ayarlanır ancak run komutunda override edilebilir - .
+# İmajın ayarları, hub.docker.com'dan hangi imajın ve sürümün çekildiği gibi bilgiler yer alır.
+# NOT: Eğer volume ataması yapılmazsa, kapsayıcı kill edildiğinde veya ortamdan silindiğinde verileriyle beraber yok olur.
+docker container inspect <container_id>
 
-docker container rm <container_id>  # container'ı siler. Çalışır durumda ise silinemez.Mutlaka exited modda olması gerekir.
+# Konteyner bilgilerinin sadece IP adresi gibi belirli bir kısmını filtreleyerek görmek için:
+docker container inspect <container_id|container_name> | grep IPAddress
 
-# port mapping nedir? ve nasıl yapılır?
-# port mapping işlemi host makinedeki bir portu container'da çalışan bir servise yönlendirmek için kullanılır. --> -p host_port:container_port
-#  örnek olarak nginx container'ını host makinede 8080 portuna bağlamak için:
+# Konteyneri diskten siler. Çalışır durumdaki konteyner silinemez, mutlaka durmuş - Exited -  modda olması gerekir.
+docker container rm <container_id>
+```
+
+---
+
+## 7. Port Eşleme - Port Mapping - 
+
+Port eşleme işlemi, fiziksel host makinedeki bir portu, konteyner içinde çalışan bir servise yönlendirmek için kullanılır. Parametre yapısı: `-p host_port:container_port` şeklindedir.
+
+```bash
+# nginx konteynerini host makinedeki 8080 portuna bağlayarak arka planda çalıştırma:
 docker container run -d -p 8080:80 nginx
-# direkt olarak fiziksel host makine üzerinden bu container'a erişim istenirse 5000 portu ile erişim sağlanır.
-docker container run -p 5000:80 nginx   --> bu komut ile fiziksel host makinenin 5000 portuna gelen trafik container'ın 80 portuna yönlendirilir.
-# container portuna erişim içinde :80 kullanılır
 
-docker container run -d -p 80/tcp --> sadece container port açılmış olur
+# Fiziksel host makine üzerinden bu konteynere 5000 portu ile erişilmesini istiyorsak:
+docker container run -p 5000:80 nginx
+# Bu komut ile host makinenin 5000 portuna gelen trafik, konteynerin 80 portuna yönlendirilir.
 
-# container üzerinde hangi portlar açık bunun kontrolü için: docker ps kullanilir.
-veya:
+# Sadece konteyner tarafında port açıp host eşlemesini Docker'a bırakmak için:
+docker container run -d -p 80/tcp
+
+# Konteyner üzerinde hangi portların eşleştiğini kontrol etmek için:
+docker ps
+# veya doğrudan port sorgulaması için:
 docker container port <container_id>
-80/tcp -> 0.0.0.0:5000 --> container içindeki 80 numaralı TCP portu, bilgisayardaki 5000 numaralı porta bağlanmıştır. 0.0.0.0 ise bilgisayarın tüm IPv4 ağ arayüzlerinden erişilebilir.
-80/tcp -> [::]:5000 --> aynı eşleşme IPv6 için de geçerlidir. [::] tüm IPv6 ağ arayüzlerini temsil eder.
 
+# Çıktı Örneği:
+# 80/tcp -> 0.0.0.0:5000  --> Konteyner içindeki 80 numaralı TCP portu, bilgisayardaki 5000 numaralı porta bağlanmıştır. 0.0.0.0 bilgisayarın tüm IPv4 ağ arayüzlerinden erişilebilir olduğunu belirtir.    
+# 80/tcp -> [::]:5000     --> Aynı eşleşmenin IPv6 karşılığıdır. [::] tüm IPv6 ağ arayüzlerini temsil eder.
+```
 
+### Dockerfile ile Port Tanımlama ve Çalıştırma
 
-image Dockerfile dosyası ile port açma
+1. `port_scanning.Dockerfile` adında bir dosya oluşturulur ve içine port tanımları yapılır - Örneğin `EXPOSE 80` - .
+2. İmajı build etmek için:
+   `
+``bash
+   docker build -f port_scanning.Dockerfile -t myimage .
+   ```
+3. İmajı otomatik port eşlemesiyle çalıştırmak için:
+   ```bash
+   # -P - büyük P - : Dockerfile içerisinde EXPOSE edilmiş tüm portlarıhost üzerindeki rastgele boş portlara otomatik eşler.
+   docker container run -d -P myimage
+   # Eğer belirli bir portta eşleşmesi isteniyorsa yine küçük -p kullanılır:
+   docker container run -d -p 5000:80 myimage
+   ```
 
-port_scanning.Dockerfile adında dosya oluşturulur.Bu dosyanın içine container için gerekli olan ayarlar yapılır.
+---
 
-docker build -f port_scanning.Dockerfile -t myimage .  --> bu komut ile image build edilip oluşturulur.
+## 8. İmaj Arama, Giriş ve Çalıştırma Örnekleri
 
-docker container run -d -P myimage  --> bu komut ile image çalıştırılır. -P ile port eşleşmesi yapılır. -d ile deatch modda çalıştırılır. -t ile tag verilir. EXPOSE edilen portların otomatik olarak eşleşmesi isteniyorsa -P kullanılır. Eğer belirli bir portta eşleşmesi isteniyorsa -p 5000:80 kullanılır.
+```bash
+# Docker Hub - hub.docker.com -  üzerinde imaj aramak için kullanılır:
+docker search mysql
 
-
-# Docker Plugins
-
-docker plugin ls  --> docker'da yüklü olan pluginleri listeler.
-docker plugin disable <plugin_id>  --> plugin'i devre dışı bırakır.
-docker plugin enable <plugin_id>  --> plugin'i etkinleştirir.
-docker plugin inspect <plugin_id>  --> plugin hakkında detaylı bilgi verir.
-docker plugin install <plugin_id>  --> plugin'i kurar.
-
-docker plugin rm <plugin_id>  --> plugin'i siler. Plugin yüklü durumda ise silinemez.Mutlaka exited modda olması gerekir.
-
-docker search <image>  --> hub.docker.com'da image arar. Örnek: docker search mysql
-
-# mysql imajını indirip çalıştır
+# MySQL imajını çevre değişkenleri - environment variables -  ve port eşlemesiyle arka planda çalıştırmak:
 docker run -d \
---name mysql \ 
--e MYSQL_ROOT_PASSWORD=1234 \ 
--p 3306:3306 \  # host_port:container_port  host'taki 3306 portunu container'daki 3306 portuna bağlar
-mysql:latest  --> mysql imajını çalıştırır.
-docker exec -it mysql mysql-db  -uroot -p  ---> mysql-db  container'ına root kullanıcısı ile bağlanır. -p  şifre istendiğini belirtir.
+  --name mysql \
+  -e MYSQL_ROOT_PASSWORD=1234 \
+  -p 3306:3306 \
+  mysql:latest
 
-# hub.docker.com için cli'den bağlanma
-docker login  --> hub.docker.com'a kullanıcı adı ve şifre ile bağlanır.
+# Çalışan MySQL konteynerine komut satırından bağlanmak:
+docker exec -it mysql mysql -uroot -p
+# mysql-db konteynerine root kullanıcısı ile bağlanır, -p şifre sorulmasını sağlar.
 
-# Dockerfile örneği
-# dockerfile_ex.Dockerfile dosyası yazılır.
-docker image build --tag dockerfile_ex <image_name> -f dockerfile_ex.Dockerfile <dockerfile_name> .   --> bu komut ile image build edilir. tag verilir.
+# Docker Hub hesabınız ile CLI üzerinden oturum açmak için:
+docker login
+```
 
-docker run --rm dockerfile_ex  --> bu komut ile image çalıştırılır. Çalışırken aynı zamanda Dockerfile içerisindeki CMD komutu çalışır ve bu komut ile container sonlanır ve --rm ile container silinir.
+---
 
+## 9. Dockerfile ile İmaj Derleme Örnekleri
+
+```bash
+# dockerfile_ex.Dockerfile dosyasından yeni bir imaj derlemek - build -  ve tag vermek için:
+docker image build --tag dockerfile_ex -f dockerfile_ex.Dockerfile .
+
+# Derlenen imajı çalıştırıp işi bittiğinde otomatik silinmesini sağlamak için:
+docker run --rm dockerfile_ex
+# NOT: Bu komut ile imaj çalıştırılır. Çalışırken aynı zamanda Dockerfile içerisindeki CMD komutu yürütülür. CMD komutu sonlandığında konteyner durur ve --rm parametresi sayesinde konteyner diskten otomatik olarak silinir.
+```
+
+---
+
+## 10. Docker Eklenti - Plugin -  Yönetimi
+
+```bash
+# Docker'da yüklü olan plugin'leri - eklentileri -  listeler:
+docker plugin ls
+
+# Belirli bir eklentiyi devre dışı bırakır:
+docker plugin disable <plugin_id>
+
+# Belirli bir eklentiyi etkinleştirir:
+docker plugin enable <plugin_id>
+
+# Eklenti hakkında detaylı JSON bilgilerini gösterir:
+docker plugin inspect <plugin_id>
+
+# Yeni bir eklenti kurar:
+docker plugin install <plugin_id>
+
+# Yüklü bir eklentiyi siler - Eklenti aktif/etkin durumda ise silinemez, önce disable edilmelidir - :
+docker plugin rm <plugin_id>
+```
