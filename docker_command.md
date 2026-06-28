@@ -363,3 +363,66 @@ docker push yasin/my-app:v1
 ```
 
 
+## 11. Docker Volume Komutları
+
+```bash
+# Docker'ın çalışma bilgisini, disk kullanımını, image sayısını, container sayısını, volume bilgilerini vb. gösterir.
+docker info
+
+# Docker Root Dir: /var/lib/docker --> Volume'un tutulduğu dizin - Linux için 
+# Docker Root Dir: C:\ProgramData\Docker (Windows için)
+
+# volume oluşturma
+docker volume create --name test1
+
+sudo -i
+
+cd /var/lib/docker/volumes/test1
+ls # --> _data klasörü bulunur. konteynerin volume'u veya datası buradadır.
+
+# volume ataması yapılması istenirse
+# 
+# Container içinde veriye bu dizin: /www/website üzerinden erişeceğim
+docker container run -it -v test1:/www/website centos:7 bash
+
+# Volume adı: test1
+# Gerçek yeri: /var/lib/docker/volumes/test1/_data
+
+# -v test1:/www/website yazılırsa, Docker kendi içinde test1 şu klasöre karşılık geliyor: /var/lib/docker/volumes/test1/_data" der.
+
+# eğer şu yazılırsa:
+# -v /var/lib/docker/volumes/test1/_data:/www/website
+# Docker şöyle düşünür: Bana bir volume adı verilmedi, bana bir host dizini verildi. Sadece hosttaki bir klasörü bağlanır.
+``` 
+
+Named volume: test1 --> Docker kendisi bulur/yönetir. --> /var/lib/docker/volumes/test1/_data
+Bind mount: /home/user/mydata --> Docker sadece hosttaki bir klasörü bağlar.
+
+```bash
+docker container run -it -v test1:/www/website centos:7 bash
+
+# cd /www/website girilir ve burada test.txt oluşturulur.
+# Çıkış yapılır.
+
+sudo -i
+
+cd /var/lib/docker/volumes/test1/_data
+ls --> test.txt dosyası görülür.
+```
+
+* Buraya bakıldığında `test.txt` dosyası görülür. Bunun nedeni,
+  Docker'ın yönettiği `test1` volume'unun fiziksel olarak Linux'ta
+  `/var/lib/docker/volumes/test1/_data` dizininde saklanmasıdır.
+
+* Container içindeki `/www/website` dizini aslında bu volume'a bağlıdır
+  (mount edilmiştir). Bu yüzden container içinde `/www/website`
+  altına yazılan dosyalar, host üzerinde `test1` volume'unun bulunduğu
+  `_data` dizinine kaydedilir.
+
+#### Aynı veriye farklı containerlardan erişme
+
+```bash
+docker container run -d -it --name test1_container -v test1:/www/website centos:7 bash
+# /www/website/ klasörü içerisine girildiğinde test.txt dosyası görülür. --> cat test.txt
+exit
+```

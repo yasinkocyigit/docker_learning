@@ -370,3 +370,68 @@ Lokal imaj listesinde görünümü:
 ```text
 127.0.0.1:5000/nginx:my_registry   ec4ed8b5299e        241MB           66MB
 ```
+
+### 5. Sorun Giderme: Veriler Host'ta Görünmüyorsa
+
+`-v` parametresi ile container başlatılmış olsa bile, bazı durumlarda host dizini (`/var/lib/docker/registry`) boş kalabilir. Bunun en sık sebebi, container'ın **farklı bir isimle** veya **yanlış volume yolu** ile başlatılmış olmasıdır.
+
+**Adım 1: Çalışan container'ı tespit edin**
+
+```sh
+docker ps
+```
+
+Container'ın adı `registry` değilse (örneğin otomatik atanmış bir isimse), bu container `--name registry` belirtilmeden başlatılmış demektir.
+
+**Adım 2: Verinin container içinde olup olmadığını kontrol edin**
+
+```sh
+docker exec <container_id_veya_isim> ls /var/lib/registry/docker/registry/v2/repositories
+```
+
+Burada push ettiğiniz imajın adını (örneğin `nginx`) görüyorsanız, registry verisi **container'ın kendi iç dosya sisteminde** duruyor demektir; sadece host'a mount edilmemiştir.
+
+**Adım 3: Mevcut veriyi host'a yedekleyin (isteğe bağlı ama önerilir)**
+
+```sh
+docker cp <container_id>:/var/lib/registry /home/<kullanici>/registry-backup
+```
+
+**Adım 4: Container'ı doğru isim ve volume mount ile yeniden oluşturun**
+
+```sh
+docker stop <container_id>
+docker rm <container_id>
+docker run -d -p 5000:5000 --restart=always --name registry \
+  -v /var/lib/docker/registry:/var/lib/registry \
+  registry:2
+```
+
+**Adım 5: Doğrulayın**
+
+```sh
+ls -l /var/lib/docker/registry/docker/registry/v2/repositories
+```
+
+Bu komut artık host üzerinde `nginx` (veya push ettiğiniz diğer imajları) göstermelidir. Bu noktadan sonra yapılan tüm `docker push` işlemleri host dizininde kalıcı olarak saklanacaktır.
+
+
+## Docker Volume
+* Container silinse dahi içerisindeki dataları tutmak için volume kullanılır.
+* Volumes, Docker Container'ları tarafından üretilen ve kullanılan verileri kalıcı kılmak için tercih edilen yöntemdir.
+* Volume oluştururken ana-host makinenin diskleri kullanılarak volume ataması gerçekleştirilir.Container'in üzerinde tutmuş olduğu veriler, host makine üzerinde belirli bir dizinde tutulur.
+
+### Docker Volume Özellikleri
+* Container silinse dahi docker volume içerisindeki datalar silinmez.
+* Docker volume içerisindeki datalar birden fazla container kullanabilir.
+* Docker Image güncellemesi yapılsa bile volume içerisindeki datalar değişmez.
+* Docker volume içerisindeki datalar taşınabilir ve yedeklenebilir.
+
+### Docker Volume Avantajları
+* Yedekleme ve migrate yapmak kolaydır.
+* Docker CLI komutlarını kullanarak docker volumes yönetilebilir.
+* Hem linux hem de windows Container'larında çalışır.
+* Containerlar arasında paylaşım yapılabilir.
+* Volume içeriği Container tarafından önceden doldurulabilir.
+* Docker volumes container boyutunu artırmaz.
+
