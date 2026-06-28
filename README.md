@@ -211,3 +211,77 @@ Tek bir Dockerfile üzerinden birden fazla layer (katman) ya da işletim sistemi
 * `docker stop`: Çalışan bir konteynerin ana sürecine kapatma sinyali (SIGTERM) göndererek durdurur.
 * `docker kill`: Çalışan bir konteyneri zorla sonlandırır (SIGKILL).
 * `docker rm`: Durdurulmuş bir konteyneri diskten tamamen siler.
+
+## Multi-Stage Build
+
+Multi-Stage Build, tek bir Dockerfile içerisinde birden fazla base image (FROM) kullanılmasına olanak sağlayan bir Docker özelliğidir. Amaç, uygulamanın derlenmesi (build) ve çalıştırılması (runtime) için gereken ortamları birbirinden ayırmaktır.
+İlk aşamada uygulama; derleyiciler, SDK'lar ve gerekli geliştirme araçları kullanılarak oluşturulur. Daha sonraki aşamada ise yalnızca çalıştırmak için gerekli dosyalar yeni ve daha hafif bir base image'e kopyalanır.
+
+Bu yöntem sayesinde:
+* Dockerfile daha düzenli ve okunabilir hale gelir.
+* Gereksiz derleme araçları son imaja dahil edilmez.
+* İmaj boyutu önemli ölçüde küçülür.
+* Güvenlik artar çünkü gereksiz paketler ve araçlar final imajında bulunmaz.
+* Build ve runtime süreçleri birbirinden ayrıldığı için bakım ve yönetim kolaylaşır.
+
+* **Tek Aşamalı (Single-Stage) Dockerfile:** İlk başta [multi_stage_operation](./multi_stage_operation) klasöründeki uygulama için şu şekilde tek aşamalı bir yapı kurulmuştu:
+    ```dockerfile
+    FROM alpine:3.5
+    RUN apk update && \
+        apk add --update alpine-sdk
+    RUN mkdir /app
+    WORKDIR /app
+    COPY helloworld.c /app
+    RUN mkdir bin
+    RUN gcc -Wall helloworld.c -o bin/helloworld
+    CMD /app/bin/helloworld
+    ```
+    Bu komutlar ile `my_app_large` adında bir imaj build ediliyor.
+
+* **Çok Aşamalı (Multi-Stage) Dockerfile:** Sonrasında Dockerfile dosyası içerisinde derleyici araçları ve çalışma ortamını ayırmak için şu yapıya geçildi:
+    ```dockerfile
+    # AS build: Bu imajın derleme (build) aşaması olduğunu belirtir
+    FROM alpine:3.5 AS build
+    RUN apk update && \
+        apk add --update alpine-sdk
+    RUN mkdir /app
+    WORKDIR /app
+    COPY helloworld.c /app
+    RUN mkdir bin
+    RUN gcc -Wall helloworld.c -o bin/helloworld
+
+    # İkinci aşama: Sadece çalışma ortamı (runtime)
+    FROM alpine:3.5
+    COPY --from=build /app/bin/helloworld /app/helloworld
+    CMD ["/app/helloworld"]
+    ```
+    Tek aşamalı imajın boyutu çok daha büyükken, `my_app_small` adında çok aşamalı imaj build edildiğinde derleme işlemleri ilk aşamada gerçekleşir ve ikinci aşamaya sadece derlenmiş dosya aktarıldığı için nihai imaj boyutu çok daha küçük olur.
+
+`my_app_small` build loglarında bu durum net şekilde görülür:
+```text
+ => [build 1/7] FROM docker.io/library/alpine:3.5@sha256:66952b313e  0.0s
+ => => resolve docker.io/library/alpine:3.5@sha256:66952b313e51c3bd  0.0s
+ => CACHED [build 2/7] RUN apk update && apk add --update alpine-sd  0.0s
+ => CACHED [build 3/7] RUN mkdir /app                                0.0s
+ => CACHED [build 4/7] WORKDIR /app                                  0.0s
+ => CACHED [build 5/7] COPY helloworld.c /app                        0.0s
+ => CACHED [build 6/7] RUN mkdir bin                                 0.0s
+ => CACHED [build 7/7] RUN gcc -Wall helloworld.c -o bin/helloworld  0.0s
+```
+*(Bu aşamalar derlemenin yapıldığı ilk aşamadır: gcc çalışır, kod derlenir, helloworld binary dosyası oluşturulur).*
+
+```text
+ => CACHED [stage-1 2/2] COPY --from=build /app/bin/helloworld /app  0.0s
+```
+*(Bu kısım ise derlenmiş kodun kopyalandığı yerdir: runtime ortamı olan multi-stage build'in kendisidir).*
+
+İmaj boyutlarının karşılaştırılması:
+```text
+my_app_large:latest         c6c28c6298f9        276MB         68.3MB        
+my_app_small:latest         68b69c6725f9       6.47MB         1.98MB      
+```
+
+* **Boyut Sonucu:** `my_app_small` imajı boyut olarak çok daha küçüktür.
+* **Multi-stage build mantığı:** Bu örnekte 1. aşama (derleme kısmı) son imaja dahil edilmez; sadece 2. aşamadaki kopyalanan dosya imaj içinde yer alır. `gcc`, `apk update` ve derleme araçları son imajda bulunmaz.
+
+

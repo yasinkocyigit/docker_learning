@@ -336,3 +336,30 @@ docker plugin install <plugin_id>
 # Yüklü bir eklentiyi siler - Eklenti aktif/etkin durumda ise silinemez, önce disable edilmelidir - :
 docker plugin rm <plugin_id>
 ```
+* Aynı image'a yeni bir repository adı ve/veya tag ekler.
+* tag, aynı image'ın farklı sürümlerini isimlendirmek için kullanılır.
+* Yeni bir image oluşturmaz, sadece mevcut image'a yeni bir referans (isim) ekler.
+
+**docker tag <image_id> <docker_hub_username>/<repository_name>:<tag>**
+
+**Örnek:**
+```bash
+docker tag <IMAGE_ID> yasin/my-app:v1
+
+# Eğer repository adı veya tag değiştirilirse:
+docker tag <IMAGE_ID> yasin/my-app1:v1
+
+# Bu durumda lokal ortamda aynı IMAGE ID'ye sahip image'a iki farklı referans (tag) eklenmiş olur:
+# yasin/my-app:v1
+# yasin/my-app1:v1
+
+# Belirtilen repository ve tag'e sahip image'ı Docker Hub - registry'e yükler.
+# Bu işlem image'ı kopyalamaz; sadece image'ın layer'larını ve manifest bilgisini ilgili tag ile yayınlar.
+
+docker push <docker_hub_username>/<repository_name>:<tag>
+
+# Örnek:
+docker push yasin/my-app:v1
+```
+
+
