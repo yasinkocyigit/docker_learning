@@ -284,4 +284,89 @@ my_app_small:latest         68b69c6725f9       6.47MB         1.98MB
 * **Boyut Sonucu:** `my_app_small` imajı boyut olarak çok daha küçüktür.
 * **Multi-stage build mantığı:** Bu örnekte 1. aşama (derleme kısmı) son imaja dahil edilmez; sadece 2. aşamadaki kopyalanan dosya imaj içinde yer alır. `gcc`, `apk update` ve derleme araçları son imajda bulunmaz.
 
+## Lokal Kişisel Docker Registry Kurulumu
 
+Lokalde kişisel bir Docker Registry oluşturarak test, gelişim ve üretim ortamları için imajlar güvenle saklanabilir, yönetilebilir ve paylaşılabilir.
+
+### 1. İşlem: Registry İmajının Çekilmesi ve Çalıştırılması
+
+İlk olarak resmi `registry` imajını çekiyoruz:
+```sh
+docker pull registry
+```
+
+İmajın verilerinin kalıcı olması için host üzerinde bir klasör oluşturulur:
+```sh
+mkdir -p /var/lib/docker/registry
+```
+
+Registry konteynerini başlatma komutu:
+```sh
+# -d: detached mode (arka planda çalıştır)
+# -p 5000:5000: host'taki 5000 portunu container'daki 5000 portuna bağla
+# -v /var/lib/docker/registry/:/var/lib/registry: host'taki dizini container'daki dizine bağla
+# registry:2: kullanılacak imaj ve versiyonu
+docker run -d -p 5000:5000 -v /var/lib/docker/registry/:/var/lib/registry registry:2
+```
+
+### 2. İşlem: daemon.json Dosyasının Düzenlenmesi
+
+hub.docker.com yerine lokaldeki güvensiz (HTTP) registry'nin kullanılabilmesi için `daemon.json` dosyasının düzenlenmesi gerekir.
+
+Dosyayı düzenlemek için açın:
+```sh
+sudo nano /etc/docker/daemon.json
+```
+
+Dosya içeriğini aşağıdaki gibi ayarlayın (lokal 5000 portu güvenli olmayan registry listesine eklenir):
+```json
+{
+  "experimental": true,
+  "debug": true,
+  "log-level": "info",
+  "insecure-registries": ["127.0.0.1:5000"]
+}
+```
+
+Değişikliklerin geçerli olması için docker servisi yeniden başlatılır:
+```sh
+sudo systemctl restart docker
+```
+
+### 3. İşlem: İmajın Lokal Registry'ye Yüklenmesi (Push)
+
+Yerelde bulunan bir imajı (örneğin `nginx`), lokal registry'ye yönlendirecek şekilde etiketliyoruz:
+```sh
+docker tag nginx 127.0.0.1:5000/nginx:my_registry
+```
+
+Etiketlenen imajı lokal registry'ye push ediyoruz:
+```sh
+docker push 127.0.0.1:5000/nginx:my_registry
+```
+
+Bu işlem başarılı bir şekilde tamamlandığında Registry arka planda şunları yapar:
+* İmaj dosyalarını katmanlarına (layer) göre parçalar.
+* Her katmana benzersiz bir şifreli isim (sha256) verir.
+* Dosyaları kendi iç sisteminde depolar.
+
+### 4. İşlem: Registry İçeriğini Sorgulama
+
+Registry'nin içindeki imajları ve etiketleri görmek için API üzerinden sorgulama yapılabilir:
+```sh
+# Depodaki imaj listesini görmek için:
+curl http://127.0.0.1:5000/v2/_catalog
+
+# nginx imajına ait etiketleri listelemek için:
+curl http://127.0.0.1:5000/v2/nginx/tags/list
+```
+
+Sorgu çıktısı (örnek):
+```json
+{"repositories":["nginx"]}
+```
+
+Lokal imaj listesinde görünümü:
+```text
+127.0.0.1:5000/nginx:my_registry   ec4ed8b5299e        241MB           66MB
+```
