@@ -426,3 +426,243 @@ docker container run -d -it --name test1_container -v test1:/www/website centos:
 # /www/website/ klasörü içerisine girildiğinde test.txt dosyası görülür. --> cat test.txt
 exit
 ```
+```bash
+   # volume'un nerede tutulduğunu görmek için
+   docker volume inspect <volume_name>
+   docker info 
+```
+
+## Sharing Volume tarafında readonly bir volume container'a assign etme
+
+```bash 
+   # nginx_log volume'unu oluştur
+   docker volume create nginx_log
+
+   # nginx_logs volumunu gosterip : ilgili container'in çalışacağı path'i gösterme ve bu path için : ro --> readonly yetkiataması
+   docker container run -it -v nginx_logs:/data/mylogs:ro centos:7 bash
+
+   # /data/mylogs dizinine girilir ve write komutu denenir: 
+   cd /data/mylogs
+   touch test.txt 
+
+   # çıktı: read-only file system --> 
+   [root@85b6b935529e mylogs]# touch test.txt
+   touch: cannot touch 'test.txt': Read-only file system
+
+   # ctrl + d + q --> containeri exited moda almadan çıkmak için 
+
+   # host makine de ilgili dizine dosya yazma
+   sudo -i
+   cd /var/lib/docker/volumes/nginx_log/_data
+   touch test1.txt
+   nano test1.txt --> içeriye ro \n rw yazılır
+
+   # container içerisinden oluşturulan dosyaya bakma
+   docker exec -it <container_id> bash
+   cd /data/mylogs
+   cat test1.txt
+```
+
+
+* **docker container işlemlerinde bütün verileri docker host üzerinden yazılacağı düşünülerek volumes tanımlaması readonly ile yaparak, bütün operasyonlar gerçekleştirilebilir. Docker host üzerinden container volumlerini yönetmeye, volume'den herhangi bir veri girişi olmasını engelleme tarafında fayda sağlar.**
+
+    
+
+### Docker Host Üzerinden Volume Loglarını Yönetme Örneği
+
+Docker volume'ları host makinede fiziksel olarak tutulduğu için, konteyner çalışırken oluşan log dosyaları doğrudan Docker host üzerinden de okunabilir. Böylece konteyner içerisine girmeden log takibi yapılabilir.
+
+```bash
+# Mevcut volume'ları listeleme
+docker volume ls
+
+# Çıktı Örneği:
+# DRIVER    VOLUME NAME
+# local     nginx_logs
+# local     test1
+```
+
+Nginx konteyneri bind mount ve volume kullanılarak çalıştırılır.
+
+```bash
+docker container run -d -P \
+  --name nginx_server \
+  -v ~/public_html:/usr/share/nginx/html \
+  -v nginx_logs:/var/log/nginx \
+  nginx
+```
+
+Konteynerin çalıştığı kontrol edilir.
+
+```bash
+docker ps
+
+# Örnek Çıktı:
+# CONTAINER ID   IMAGE    PORTS
+# a72977b0b02c   nginx    0.0.0.0:32768->80/tcp
+```
+
+Konteyner içerisindeki log dizinine girilir.
+
+```bash
+docker container exec -it nginx_server bash
+
+cd /var/log/nginx
+ls
+
+# Çıktı:
+# access.log
+# error.log
+# test1.txt
+```
+
+Log dosyaları konteyner içerisinden takip edilir.
+
+```bash
+# Access log
+tail -f access.log
+
+# Error log
+tail -f error.log
+```
+
+Aynı log dosyaları Docker host üzerinden de takip edilir.
+
+```bash
+sudo -i
+
+# Access log
+tail -f /var/lib/docker/volumes/nginx_logs/_data/access.log
+
+# Error log
+tail -f /var/lib/docker/volumes/nginx_logs/_data/error.log
+```
+
+Bu örnekte görüldüğü gibi;
+
+- `nginx_logs` isimli Docker volume'u hem konteynere mount edilir hem de Docker host üzerinde `/var/lib/docker/volumes/nginx_logs/_data` dizininde tutulur.
+- Konteyner tarafından oluşturulan `access.log` ve `error.log` dosyaları doğrudan host üzerinden okunabilir.
+- Böylece `docker exec` ile konteyner içerisine girmeden log takibi yapılabilir.
+- Aynı volume'u kullanan birden fazla konteyner bulunuyorsa tüm loglar Docker host üzerinden merkezi olarak yönetilebilir.
+
+> **Not:** `/var/lib/docker/volumes/` dizinine normal kullanıcıların erişim yetkisi bulunmaz. Bu nedenle host üzerinden log incelemek için genellikle `sudo` kullanılır.
+
+
+
+### docker volume external
+
+
+```bash
+   yasin@yasin:~/Desktop/github/docker_learning$ docker volume create --opt type=nfs --opt o=addr=192.168.1.10,rw,nfsserver --opt device=://home/nfsshare nfs-volume
+
+```
+
+yasin@yasin:~/Desktop/github/docker_learning$ docker volume inspect nfs-volume
+[
+    {
+        "CreatedAt": "2026-06-29T20:03:54+03:00",
+        "Driver": "local",
+        "Labels": null,
+        "Mountpoint": "/var/lib/docker/volumes/nfs-volume/_data",
+        "Name": "nfs-volume",
+        "Options": {
+            "device": "://home/nfsshare",
+            "o": "addr=192.168.1.10,rw,nfsserver",
+            "type": "nfs"
+        },
+        "Scope": "local"
+    }
+]
+yasin@yasin:~/Desktop/github/docker_learning$ docker volume image
+docker: unknown command: docker volume image
+
+Usage:  docker volume COMMAND
+
+Run 'docker volume --help' for more information
+yasin@yasin:~/Desktop/github/docker_learning$ docker volume inspect image
+[
+    {
+        "CreatedAt": "2026-06-29T19:48:55+03:00",
+        "Driver": "local",
+        "Labels": null,
+        "Mountpoint": "/var/lib/docker/volumes/image/_data",
+        "Name": "image",
+        "Options": null,
+        "Scope": "local"
+    }
+]
+
+
+### NFS - External -  Volume Oluşturma ve Bağlama
+
+Docker volume'ları sadece host diskinde değil, NFS - Network File System -  protokolü ile uzak bir sunucudaki dizinde de tutulabilir. Bu sayede birden fazla Docker host, aynı veriye ağ üzerinden erişebilir.
+
+```bash
+# NFS tipinde bir volume oluşturma
+docker volume create \
+  --driver local \                # NFS, ayrı bir driver değildir; "local" driver'ın mount seçeneği olarak kullanılır
+  --opt type=nfs \                # Mount tipini NFS olarak belirtir
+  --opt o=addr=192.168.1.10,rw \  # NFS mount seçenekleri: addr=sunucu IP'si, rw=okuma/yazma izni
+  --opt device=:/home/nfsshare \  # NFS sunucusunda export edilmiş - paylaşıma açılmış -  dizin yolu
+  nfs-volume                      # Volume'a verilen isim - local etiket - 
+```
+
+```bash
+docker volume inspect nfs-volume
+
+# Çıktı Örneği:
+# [
+#     {
+#         "CreatedAt": "2026-06-29T20:12:07+03:00",
+#         "Driver": "local",
+#         "Labels": null,
+#         "Mountpoint": "/var/lib/docker/volumes/nfs-volume/_data",
+#         "Name": "nfs-volume",
+#         "Options": {
+#             "device": ":/home/nfsshare",
+#             "o": "addr=192.168.1.10,rw",
+#             "type": "nfs"
+#         },
+#         "Scope": "local"
+#     }
+# ]
+```
+
+#### Volume'u Container'a Bağlama
+
+```bash
+docker run -it -v nfs-volume:/nfsshare centos:7
+
+# Eğer NFS sunucusu çalışmıyorsa veya export yolu hatalıysa:
+# docker: Error response from daemon: error while mounting volume
+# '/var/lib/docker/volumes/nfs-volume/_data': failed to mount local volume:
+# mount :/home/nfsshare:/var/lib/docker/volumes/nfs-volume/_data, data: addr=192.168.1.10: invalid argument
+```
+
+`-v nfs-volume:/nfsshare` kısmındaki `/nfsshare`, container içinde göreceğiniz mount noktasıdır - keyfi bir isimdir, NFS sunucusundaki gerçek export yolu olan `/home/nfsshare` ile aynı olmak zorunda değildir.
+
+
+#### Karşı Tarafta NFS Sunucusunun Çalışıyor Olması
+
+`device` ve `o=addr` doğru yazılmış olsa bile, belirtilen IP adresinde **çalışan bir NFS sunucusu** ve o sunucuda export edilmiş ilgili dizin olmadan mount işlemi her zaman başarısız olur:
+
+```bash
+sudo systemctl status nfs-server
+
+# Çıktı:
+# ○ nfs-server.service - NFS server and services
+#      Active: inactive (dead)   <-- sorunun kaynağı
+```
+
+Çözüm için karşı sunucuda:
+
+```bash
+# Ubuntu/Debian
+sudo apt install nfs-kernel-server
+sudo systemctl enable --now nfs-server
+
+# /etc/exports dosyasına satır eklenir:
+# /home/nfsshare 192.168.1.0/24(rw,sync,no_subtree_check)
+
+sudo exportfs -ra
+```
